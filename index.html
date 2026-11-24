@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organização | Gerenciador de Tarefas</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Firebase SDKs (Web Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-[#f4f6fa] text-[#1e293b] font-sans antialiased overflow-hidden select-none h-screen flex flex-col">
+
+  <!-- TOP HEADER (CLEAN & SPACIOUS) -->
+  <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-30 flex-shrink-0 shadow-sm">
+    <div class="flex items-center space-x-4">
+      <!-- App Logo -->
+      <div class="flex items-center space-x-2.5 cursor-pointer">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0073ea] to-[#00c875] flex items-center justify-center text-white shadow-md">
+          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+        </div>
+        <span class="font-extrabold text-xl tracking-tight text-gray-900">Organizador<span class="text-xs font-bold text-[#0073ea] ml-1.5 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">PRO</span></span>
+      </div>
+
+      <div class="h-6 w-[1px] bg-gray-200 mx-1"></div>
+
+      <!-- Views Selector Tabs (Rounded Modern Pills) -->
+      <div class="flex items-center space-x-1.5 bg-gray-100 p-1.5 rounded-2xl">
+        <button id="viewTabTable" class="view-tab active flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-xl transition" onclick="switchView('table')">
+          <i data-lucide="table" class="w-4 h-4"></i>
+          <span>Quadro</span>
+        </button>
+        <button id="viewTabKanban" class="view-tab flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-xl transition" onclick="switchView('kanban')">
+          <i data-lucide="kanban" class="w-4 h-4"></i>
+          <span>Kanban</span>
+        </button>
+        <button id="viewTabCalendar" class="view-tab flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-xl transition" onclick="switchView('calendar')">
+          <i data-lucide="calendar" class="w-4 h-4"></i>
+          <span>Calendário</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Input Bar (Real-Time Search) -->
+    <div class="relative w-80 max-w-md hidden md:block">
+      <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
+      <input type="text" id="globalSearchInput" placeholder="Pesquisar tarefas por nome ou status..." 
+        class="w-full bg-gray-50 hover:bg-gray-100/70 text-xs text-gray-800 placeholder-gray-400 rounded-full pl-10 pr-4 py-2.5 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0073ea]/30 focus:border-[#0073ea] transition">
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center space-x-2.5">
+      <!-- Cloud Sync Status Button -->
+      <button id="cloudStatusBtn" onclick="openCloudConfigModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition shadow-sm bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100" title="Clique para conectar ou configurar o Banco de Dados em Nuvem">
+        <span id="cloudStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+        <span id="cloudStatusText">Modo Local</span>
+      </button>
+
+      <!-- Backup / Exportar & Importar -->
+      <button onclick="exportDataBackup()" class="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Baixar cópia de segurança">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span>Backup</span>
+      </button>
+
+      <button onclick="triggerImportBackup()" class="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Restaurar backup">
+        <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+        <span>Restaurar</span>
+      </button>
+      <input type="file" id="backupFileInput" class="hidden" accept=".json" onchange="handleImportFile(event)">
+
+      <!-- Button to Open New Group Modal -->
+      <button onclick="openCreateGroupModal()" class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[#0073ea] bg-blue-50 hover:bg-blue-100 border border-blue-200 transition shadow-sm">
+        <i data-lucide="folder-plus" class="w-4 h-4"></i>
+        <span>Novo Grupo</span>
+      </button>
+
+      <!-- Button to Create Task -->
+      <button id="mainCreateTaskBtn" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] shadow-sm transition">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+        <span>Nova Tarefa</span>
+      </button>
+
+      <!-- User Profile Badge -->
+      <div class="w-9 h-9 rounded-full bg-[#175e54] text-white text-xs flex items-center justify-center font-bold shadow-sm" title="Allan Nunes">
+        AN
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- CLEAN SIDEBAR: WORKSPACES & GROUPS LIST -->
+    <aside id="workspaceSidebar" class="w-60 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-all duration-200 z-10 shadow-sm">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Grupos de Tarefas</span>
+        <button onclick="openCreateGroupModal()" class="text-[#0073ea] hover:bg-blue-50 p-1.5 rounded-lg transition" title="Criar novo grupo">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Quick Group Navigation List -->
+      <div id="sidebarGroupsList" class="p-2.5 space-y-1.5 flex-1 overflow-y-auto">
+        <!-- Rendered dynamically via app.js -->
+      </div>
+
+      <!-- Bottom Quick Actions -->
+      <div class="p-3.5 border-t border-gray-100 space-y-2">
+        <button onclick="openCloudConfigModal()" class="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 transition">
+          <i data-lucide="cloud" class="w-4 h-4 text-[#0073ea]"></i>
+          <span>Banco de Dados</span>
+        </button>
+        <button onclick="openCreateGroupModal()" class="w-full flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-bold text-[#0073ea] bg-blue-50 hover:bg-blue-100 transition shadow-sm">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Criar Grupo</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN BOARD WORK AREA -->
+    <main class="flex-1 flex flex-col bg-[#f4f6fa] overflow-hidden relative">
+
+      <!-- TOOLBAR: FILTERS & BOARD TITLE -->
+      <div class="px-6 py-3.5 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm flex-wrap gap-3">
+        <div class="flex items-center space-x-3.5">
+          <!-- Board Title (Inline Editable) -->
+          <h1 id="boardTitle" class="text-2xl font-black text-gray-900 tracking-tight cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-xl transition flex items-center space-x-2" title="Clique para editar o título">
+            <span>Organização</span>
+            <i data-lucide="pencil" class="w-4 h-4 text-gray-400"></i>
+          </h1>
+
+          <div class="h-5 w-[1px] bg-gray-200"></div>
+
+          <!-- Status Filter Dropdown -->
+          <div class="relative">
+            <button id="filterDropdownBtn" class="flex items-center space-x-2 text-xs text-gray-700 hover:text-gray-900 px-3.5 py-2 rounded-full hover:bg-gray-100 border border-gray-200 transition bg-white shadow-sm font-semibold">
+              <i data-lucide="filter" class="w-3.5 h-3.5 text-gray-500"></i>
+              <span id="activeFilterLabel">Filtrar por Status</span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-gray-400"></i>
+            </button>
+            <div id="filterDropdownMenu" class="hidden absolute top-10 left-0 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl py-2 z-40 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- Right Action Buttons -->
+        <div class="flex items-center space-x-2.5">
+          <button onclick="openManageMembersModal()" class="flex items-center space-x-1.5 px-3.5 py-2 text-xs text-gray-700 hover:text-[#0073ea] hover:bg-blue-50 rounded-full border border-gray-200 transition bg-white shadow-sm font-semibold">
+            <i data-lucide="users" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Responsáveis</span>
+          </button>
+
+          <button onclick="openManageLabelsModal('status')" class="flex items-center space-x-1.5 px-3.5 py-2 text-xs text-gray-700 hover:text-[#0073ea] hover:bg-blue-50 rounded-full border border-gray-200 transition bg-white shadow-sm font-semibold">
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-purple-600"></i>
+            <span>Etiquetas</span>
+          </button>
+
+          <button onclick="openManageLabelsModal('priority')" class="flex items-center space-x-1.5 px-3.5 py-2 text-xs text-gray-700 hover:text-[#0073ea] hover:bg-blue-50 rounded-full border border-gray-200 transition bg-white shadow-sm font-semibold">
+            <i data-lucide="flag" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>Prioridades</span>
+          </button>
+
+          <button id="toggleAllGroupsBtn" class="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 border border-gray-200 bg-white" title="Recolher / Expandir todos os grupos">
+            <i data-lucide="chevrons-up-down" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW CONTAINER -->
+      <div id="viewContainer" class="flex-1 overflow-y-auto p-6 relative"></div>
+
+    </main>
+
+    <!-- RIGHT TASK DETAIL DRAWER -->
+    <div id="taskDrawer" class="fixed right-0 top-16 bottom-0 w-[460px] bg-white border-l border-gray-200 shadow-2xl transform translate-x-full transition-transform duration-200 z-50 flex flex-col">
+      <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
+        <div class="flex items-center space-x-2 truncate">
+          <i data-lucide="check-square" class="w-5 h-5 text-[#0073ea]"></i>
+          <h2 id="drawerTaskTitle" class="text-base font-bold text-gray-900 truncate cursor-pointer hover:bg-gray-100 px-2 py-1 rounded-lg">Título da Tarefa</h2>
+        </div>
+        <div class="flex items-center space-x-2 text-gray-400">
+          <button id="drawerDeleteTaskBtn" class="p-1.5 hover:text-red-500 rounded-lg hover:bg-red-50 transition" title="Excluir tarefa">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+          <button id="closeDrawerBtn" class="p-1.5 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition" title="Fechar">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-5 text-xs text-gray-700">
+        <div class="grid grid-cols-3 gap-y-3.5 gap-x-2 items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
+          <span class="text-gray-500 font-semibold">Status</span>
+          <div class="col-span-2" id="drawerStatusSlot"></div>
+
+          <span class="text-gray-500 font-semibold">Prioridade</span>
+          <div class="col-span-2" id="drawerPrioritySlot"></div>
+
+          <span class="text-gray-500 font-semibold">Responsável</span>
+          <div class="col-span-2" id="drawerAssigneeSlot"></div>
+
+          <span class="text-gray-500 font-semibold">Prazo</span>
+          <div class="col-span-2" id="drawerDueDateSlot"></div>
+
+          <span class="text-gray-500 font-semibold">Orçamento</span>
+          <div class="col-span-2" id="drawerBudgetSlot"></div>
+
+          <span class="text-gray-500 font-semibold">Cronograma</span>
+          <div class="col-span-2" id="drawerTimelineSlot"></div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-800 mb-1.5">Anotações / Descrição</label>
+          <textarea id="drawerDescription" rows="4" placeholder="Adicione notas, orientações ou contexto para esta tarefa..." 
+            class="w-full text-xs p-3 border border-gray-200 rounded-xl focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20 focus:outline-none transition"></textarea>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="font-bold text-gray-800">Checklist de Subtarefas</label>
+            <span id="subtasksCounter" class="text-gray-500 text-[11px] font-semibold bg-gray-100 px-2.5 py-0.5 rounded-full">0/0</span>
+          </div>
+          <div id="subtasksList" class="space-y-2 mb-2.5"></div>
+          <div class="flex space-x-2">
+            <input type="text" id="newSubtaskInput" placeholder="Nova subtarefa..." 
+              class="flex-1 text-xs px-3 py-2 border border-gray-200 rounded-xl focus:border-[#0073ea] focus:outline-none">
+            <button id="addSubtaskBtn" class="bg-[#0073ea] hover:bg-[#0060b9] text-white px-3.5 py-2 rounded-xl font-semibold transition">Adicionar</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-800 mb-1.5">Arquivos Anexados</label>
+          <div id="drawerFilesList" class="space-y-2 mb-2"></div>
+          <button id="drawerUploadFileBtn" class="flex items-center space-x-1.5 text-xs text-[#0073ea] hover:underline font-semibold">
+            <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>
+            <span>Anexar novo arquivo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="dropdownPortal" class="fixed inset-0 pointer-events-none z-50"></div>
+
+  <!-- MODAL: CRIAR NOVO GRUPO DE TAREFAS -->
+  <div id="createGroupModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-200 animate-fadeIn">
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex items-center space-x-2 text-[#0073ea]">
+          <i data-lucide="folder-plus" class="w-5 h-5"></i>
+          <h3 class="text-base font-bold text-gray-900">Criar Novo Grupo de Tarefas</h3>
+        </div>
+        <button onclick="closeCreateGroupModal()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-1.5">Nome do Grupo</label>
+          <input type="text" id="newGroupNameInput" placeholder="Ex: Backlog, Em Produção, Revisão..." 
+            class="w-full text-sm font-medium px-4 py-2.5 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:ring-2 focus:ring-[#0073ea]/20 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 mb-2">Cor de Identificação</label>
+          <div id="modalColorPalette" class="grid grid-cols-8 gap-2.5"></div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-100 flex items-center justify-end space-x-2">
+          <button onclick="closeCreateGroupModal()" class="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition">
+            Cancelar
+          </button>
+          <button onclick="confirmCreateGroup()" class="px-5 py-2.5 text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] rounded-xl transition shadow-sm flex items-center space-x-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Criar Grupo</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GERENCIADOR DEDICADO DE ETIQUETAS -->
+  <div id="labelsModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 border border-gray-200 animate-fadeIn max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+        <div class="flex items-center space-x-2 text-[#0073ea]">
+          <i data-lucide="tag" class="w-5 h-5"></i>
+          <h3 id="labelsModalTitle" class="text-base font-extrabold text-gray-900">Gerenciar Etiquetas</h3>
+        </div>
+        <button onclick="closeManageLabelsModal()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="labelsModalList" class="space-y-2.5 overflow-y-auto flex-1 pr-1 mb-4"></div>
+
+      <div class="pt-3 border-t border-gray-200 space-y-3">
+        <span class="text-xs font-bold text-gray-700 block">+ Adicionar Nova Etiqueta</span>
+        <div class="flex items-center space-x-2">
+          <div id="modalNewColorPreview" class="w-7 h-7 rounded-full cursor-pointer shadow-sm border border-black/10 flex-shrink-0" title="Clique para escolher a cor"></div>
+          <input type="text" id="modalNewNameInput" placeholder="Nome da nova etiqueta..." 
+            class="flex-1 text-xs font-semibold px-3 py-2 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:outline-none">
+          <button onclick="confirmAddNewLabelFromModal()" class="bg-[#0073ea] hover:bg-[#0060b9] text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Adicionar</span>
+          </button>
+        </div>
+
+        <div id="modalNewColorPalette" class="grid grid-cols-8 gap-2 pt-1"></div>
+
+        <div class="flex justify-end pt-2">
+          <button onclick="closeManageLabelsModal()" class="px-5 py-2 text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] rounded-xl transition shadow-sm">
+            Concluir e Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GERENCIADOR DEDICADO DE RESPONSÁVEIS / MEMBROS -->
+  <div id="membersModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 border border-gray-200 animate-fadeIn max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+        <div class="flex items-center space-x-2 text-emerald-600">
+          <i data-lucide="users" class="w-5 h-5"></i>
+          <h3 class="text-base font-extrabold text-gray-900">Gerenciar Responsáveis / Membros</h3>
+        </div>
+        <button onclick="closeManageMembersModal()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="membersModalList" class="space-y-2.5 overflow-y-auto flex-1 pr-1 mb-4"></div>
+
+      <div class="pt-3 border-t border-gray-200 space-y-3">
+        <span class="text-xs font-bold text-gray-700 block">+ Adicionar Novo Responsável</span>
+        <div class="flex items-center space-x-2">
+          <div id="modalNewMemberColorPreview" class="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-sm border border-black/10 flex-shrink-0">
+            ?
+          </div>
+          <input type="text" id="modalNewMemberNameInput" placeholder="Nome completo (ex: Laura Dias)..." 
+            class="flex-1 text-xs font-semibold px-3.5 py-2 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:outline-none"
+            oninput="updateNewMemberAvatarPreview(this.value)">
+          <button onclick="confirmAddNewMemberFromModal()" class="bg-[#0073ea] hover:bg-[#0060b9] text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-1">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Adicionar</span>
+          </button>
+        </div>
+
+        <div id="modalNewMemberColorPalette" class="grid grid-cols-8 gap-2 pt-1"></div>
+
+        <div class="flex justify-end pt-2">
+          <button onclick="closeManageMembersModal()" class="px-5 py-2 text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] rounded-xl transition shadow-sm">
+            Concluir e Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONECTAR BANCO DE DADOS EM NUVEM (FIREBASE) -->
+  <div id="cloudConfigModal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 border border-gray-200 animate-fadeIn">
+      <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+        <div class="flex items-center space-x-2 text-[#0073ea]">
+          <i data-lucide="cloud" class="w-5 h-5"></i>
+          <h3 class="text-base font-extrabold text-gray-900">Banco de Dados em Nuvem (Firebase)</h3>
+        </div>
+        <button onclick="closeCloudConfigModal()" class="text-gray-400 hover:text-gray-600 p-1.5 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div class="bg-blue-50 border border-blue-200 text-blue-900 p-3.5 rounded-2xl leading-relaxed">
+          <strong>Sincronização em Tempo Real</strong>: Cole as chaves do seu projeto gratuito no 
+          <a href="https://console.firebase.google.com/" target="_blank" class="underline font-bold text-[#0073ea]">Firebase Console</a> 
+          para sincronizar suas tarefas entre o trabalho, casa e celular instantaneamente!
+        </div>
+
+        <div>
+          <label class="block font-bold text-gray-700 mb-1">API Key</label>
+          <input type="text" id="firebaseApiKeyInput" placeholder="AIzaSy..." 
+            class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:outline-none font-mono text-[11px]">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">Project ID</label>
+            <input type="text" id="firebaseProjectIdInput" placeholder="meu-organizador-123" 
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:outline-none font-mono text-[11px]">
+          </div>
+          <div>
+            <label class="block font-bold text-gray-700 mb-1">App ID</label>
+            <input type="text" id="firebaseAppIdInput" placeholder="1:123456:web:abcd..." 
+              class="w-full px-3 py-2 border border-gray-300 rounded-xl focus:border-[#0073ea] focus:outline-none font-mono text-[11px]">
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+          <button onclick="disconnectFirebase()" class="text-red-500 hover:underline font-bold">
+            Usar apenas Modo Local
+          </button>
+          <div class="flex items-center space-x-2">
+            <button onclick="closeCloudConfigModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-bold">
+              Cancelar
+            </button>
+            <button onclick="saveAndConnectFirebase()" class="px-5 py-2 text-white bg-[#0073ea] hover:bg-[#0060b9] rounded-xl font-bold shadow-sm">
+              Conectar e Sincronizar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
