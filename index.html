@@ -2,35 +2,143 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Organização | Gerenciador de Tarefas</title>
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0073ea">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Organizador">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Firebase SDKs (Web Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase-config.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-[#f4f6fa] text-[#1e293b] font-sans antialiased overflow-hidden select-none h-screen flex flex-col">
 
-  <!-- TOP HEADER (CLEAN & SPACIOUS) -->
-  <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-30 flex-shrink-0 shadow-sm">
-    <div class="flex items-center space-x-4">
-      <!-- App Logo -->
-      <div class="flex items-center space-x-2.5 cursor-pointer">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0073ea] to-[#00c875] flex items-center justify-center text-white shadow-md">
-          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LOGIN / REGISTRO SCREEN (FULLSCREEN OVERLAY) -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="loginScreen" class="fixed inset-0 z-[100] bg-gradient-to-br from-[#0a1628] via-[#0f2847] to-[#0a1628] flex items-center justify-center p-4">
+    <!-- Decorative background dots -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+      <div class="absolute w-96 h-96 rounded-full bg-[#0073ea]/30 blur-3xl -top-20 -left-20"></div>
+      <div class="absolute w-80 h-80 rounded-full bg-[#00c875]/20 blur-3xl -bottom-20 -right-20"></div>
+    </div>
+
+    <div class="relative w-full max-w-md">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-[#0073ea] to-[#00c875] flex items-center justify-center text-white shadow-2xl mb-4">
+          <i data-lucide="check-circle-2" class="w-8 h-8"></i>
         </div>
-        <span class="font-extrabold text-xl tracking-tight text-gray-900">Organizador<span class="text-xs font-bold text-[#0073ea] ml-1.5 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">PRO</span></span>
+        <h1 class="text-3xl font-black text-white tracking-tight">Organizador<span class="text-sm font-bold text-[#00c875] ml-2">PRO</span></h1>
+        <p class="text-sm text-gray-400 mt-1.5">Gerencie suas tarefas com eficiência</p>
       </div>
 
-      <div class="h-6 w-[1px] bg-gray-200 mx-1"></div>
+      <!-- Login Card -->
+      <div class="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/10 p-8 shadow-2xl">
+        <div id="loginError" class="hidden bg-red-500/15 border border-red-500/30 text-red-300 text-xs font-semibold p-3.5 rounded-2xl mb-5 flex items-center space-x-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+          <span id="loginErrorText">Erro ao fazer login</span>
+        </div>
 
-      <!-- Views Selector Tabs (Rounded Modern Pills) -->
-      <div class="flex items-center space-x-1.5 bg-gray-100 p-1.5 rounded-2xl">
+        <div id="loginSuccessMsg" class="hidden bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold p-3.5 rounded-2xl mb-5 flex items-center space-x-2">
+          <i data-lucide="check-circle" class="w-4 h-4 flex-shrink-0"></i>
+          <span id="loginSuccessText">Conta criada com sucesso!</span>
+        </div>
+
+        <!-- Tab Selector: Login / Register -->
+        <div class="flex items-center bg-white/5 rounded-2xl p-1.5 mb-6">
+          <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-white bg-white/10">Entrar</button>
+          <button id="tabRegister" onclick="switchAuthTab('register')" class="flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-gray-400 hover:text-gray-200">Criar Conta</button>
+        </div>
+
+        <form id="authForm" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+          <!-- Name field (register only) -->
+          <div id="registerNameField" class="hidden">
+            <label class="block text-xs font-bold text-gray-300 mb-1.5">Nome Completo</label>
+            <div class="relative">
+              <i data-lucide="user" class="w-4 h-4 absolute left-3.5 top-3 text-gray-500"></i>
+              <input type="text" id="authName" placeholder="Seu nome completo" autocomplete="name"
+                class="w-full bg-white/5 border border-white/10 text-white placeholder-gray-500 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0073ea]/50 focus:border-[#0073ea] transition">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-300 mb-1.5">E-mail</label>
+            <div class="relative">
+              <i data-lucide="mail" class="w-4 h-4 absolute left-3.5 top-3 text-gray-500"></i>
+              <input type="email" id="authEmail" placeholder="seu@email.com" required autocomplete="email"
+                class="w-full bg-white/5 border border-white/10 text-white placeholder-gray-500 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0073ea]/50 focus:border-[#0073ea] transition">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-300 mb-1.5">Senha</label>
+            <div class="relative">
+              <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3 text-gray-500"></i>
+              <input type="password" id="authPassword" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="current-password"
+                class="w-full bg-white/5 border border-white/10 text-white placeholder-gray-500 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0073ea]/50 focus:border-[#0073ea] transition">
+            </div>
+          </div>
+
+          <button type="submit" id="authSubmitBtn"
+            class="w-full py-3 bg-gradient-to-r from-[#0073ea] to-[#00a3ff] hover:from-[#0060b9] hover:to-[#0090e0] text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span id="authSubmitText">Entrar</span>
+          </button>
+        </form>
+
+        <div class="mt-5 text-center">
+          <button id="forgotPasswordBtn" onclick="handleForgotPassword()" class="text-xs text-gray-400 hover:text-[#0073ea] transition font-semibold">
+            Esqueceu sua senha?
+          </button>
+        </div>
+      </div>
+
+      <p class="text-center text-[11px] text-gray-500 mt-5">Protegido com autenticação Firebase</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- APP CONTENT (HIDDEN UNTIL AUTHENTICATED) -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="appContent" class="hidden h-screen flex flex-col">
+
+  <!-- TOP HEADER (CLEAN, MODERN & FULLY RESPONSIVE) -->
+  <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-6 z-30 flex-shrink-0 shadow-sm safe-top">
+    <div class="flex items-center space-x-2 sm:space-x-4">
+      <!-- Mobile Hamburger Button -->
+      <button id="mobileMenuBtn" onclick="toggleMobileSidebar()" class="md:hidden text-gray-700 hover:text-[#0073ea] p-2 rounded-xl hover:bg-gray-100 transition" title="Abrir menu de grupos">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <!-- App Logo -->
+      <div class="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-[#0073ea] to-[#00c875] flex items-center justify-center text-white shadow-md flex-shrink-0">
+          <i data-lucide="check-circle-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+        </div>
+        <span class="font-extrabold text-base sm:text-xl tracking-tight text-gray-900">Organizador<span class="text-[10px] sm:text-xs font-bold text-[#0073ea] ml-1 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">PRO</span></span>
+      </div>
+
+      <div class="h-6 w-[1px] bg-gray-200 mx-1 hidden md:block"></div>
+
+      <!-- Views Selector Tabs (Desktop Pills) -->
+      <div class="hidden md:flex items-center space-x-1.5 bg-gray-100 p-1.5 rounded-2xl">
         <button id="viewTabTable" class="view-tab active flex items-center space-x-2 px-4 py-2 text-xs font-bold rounded-xl transition" onclick="switchView('table')">
           <i data-lucide="table" class="w-4 h-4"></i>
           <span>Quadro</span>
@@ -47,61 +155,93 @@
     </div>
 
     <!-- Search Input Bar (Real-Time Search) -->
-    <div class="relative w-80 max-w-md hidden md:block">
+    <div class="relative w-72 max-w-md hidden md:block">
       <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-gray-400"></i>
-      <input type="text" id="globalSearchInput" placeholder="Pesquisar tarefas por nome ou status..." 
+      <input type="text" id="globalSearchInput" placeholder="Pesquisar tarefas..." 
         class="w-full bg-gray-50 hover:bg-gray-100/70 text-xs text-gray-800 placeholder-gray-400 rounded-full pl-10 pr-4 py-2.5 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#0073ea]/30 focus:border-[#0073ea] transition">
     </div>
 
     <!-- Header Actions -->
-    <div class="flex items-center space-x-2.5">
+    <div class="flex items-center space-x-1.5 sm:space-x-2.5">
       <!-- Cloud Sync Status Button -->
-      <button id="cloudStatusBtn" onclick="openCloudConfigModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition shadow-sm bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100" title="Clique para conectar ou configurar o Banco de Dados em Nuvem">
+      <button id="cloudStatusBtn" onclick="openCloudConfigModal()" class="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold border transition shadow-sm bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100" title="Clique para configurar sincronização em nuvem">
         <span id="cloudStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-        <span id="cloudStatusText">Modo Local</span>
+        <span id="cloudStatusText" class="hidden sm:inline">Modo Local</span>
       </button>
 
-      <!-- Backup / Exportar & Importar -->
-      <button onclick="exportDataBackup()" class="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Baixar cópia de segurança">
+      <!-- Backup / Exportar & Importar (Desktop) -->
+      <button onclick="exportDataBackup()" class="hidden lg:flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Baixar cópia de segurança">
         <i data-lucide="download" class="w-3.5 h-3.5"></i>
         <span>Backup</span>
       </button>
 
-      <button onclick="triggerImportBackup()" class="flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Restaurar backup">
+      <button onclick="triggerImportBackup()" class="hidden lg:flex items-center space-x-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 transition" title="Restaurar backup">
         <i data-lucide="upload" class="w-3.5 h-3.5"></i>
         <span>Restaurar</span>
       </button>
       <input type="file" id="backupFileInput" class="hidden" accept=".json" onchange="handleImportFile(event)">
 
-      <!-- Button to Open New Group Modal -->
-      <button onclick="openCreateGroupModal()" class="flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-bold text-[#0073ea] bg-blue-50 hover:bg-blue-100 border border-blue-200 transition shadow-sm">
+      <!-- Button to Open New Group Modal (Desktop) -->
+      <button onclick="openCreateGroupModal()" class="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#0073ea] bg-blue-50 hover:bg-blue-100 border border-blue-200 transition shadow-sm">
         <i data-lucide="folder-plus" class="w-4 h-4"></i>
         <span>Novo Grupo</span>
       </button>
 
       <!-- Button to Create Task -->
-      <button id="mainCreateTaskBtn" class="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] shadow-sm transition">
+      <button id="mainCreateTaskBtn" class="flex items-center space-x-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-white bg-[#0073ea] hover:bg-[#0060b9] shadow-sm transition">
         <i data-lucide="plus" class="w-4 h-4"></i>
-        <span>Nova Tarefa</span>
+        <span class="hidden sm:inline">Nova Tarefa</span>
       </button>
 
-      <!-- User Profile Badge -->
-      <div class="w-9 h-9 rounded-full bg-[#175e54] text-white text-xs flex items-center justify-center font-bold shadow-sm" title="Allan Nunes">
-        AN
+      <!-- User Profile Badge & Logout -->
+      <div class="relative group">
+        <div id="userProfileBadge" class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#175e54] text-white text-xs flex items-center justify-center font-bold shadow-sm flex-shrink-0 cursor-pointer" title="Minha conta">
+          <span id="userInitials">AN</span>
+        </div>
+        <div class="hidden group-hover:flex absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-xl py-2 px-1 min-w-[180px] flex-col z-50 text-xs">
+          <div class="px-3 py-2 text-gray-500 font-semibold border-b border-gray-100 mb-1">
+            <div id="userDisplayName" class="text-gray-800 font-bold text-sm truncate">Allan Nunes</div>
+            <div id="userDisplayEmail" class="text-gray-400 truncate text-[11px]">email@example.com</div>
+          </div>
+          <button onclick="handleLogout()" class="w-full text-left px-3 py-2 text-red-500 hover:bg-red-50 rounded-xl font-bold flex items-center space-x-2 transition">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>Sair da conta</span>
+          </button>
+        </div>
       </div>
     </div>
   </header>
 
-  <!-- MAIN APP CONTAINER -->
-  <div class="flex-1 flex overflow-hidden">
+  <!-- PWA INSTALL BANNER (SMARTPHONE APP BANNER) -->
+  <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-[#0073ea] to-[#00c875] text-white px-4 py-2.5 flex items-center justify-between text-xs font-semibold shadow-md z-30 transition-all">
+    <div class="flex items-center space-x-2">
+      <i data-lucide="smartphone" class="w-4 h-4 flex-shrink-0"></i>
+      <span>Instale o Organizador no celular para uso offline instantâneo!</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button id="pwaInstallBtn" class="bg-white text-[#0073ea] px-3 py-1 rounded-xl font-bold text-xs shadow-sm hover:bg-gray-100 transition">Instalar</button>
+      <button id="pwaDismissBtn" class="p-1 hover:text-gray-200 transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
 
-    <!-- CLEAN SIDEBAR: WORKSPACES & GROUPS LIST -->
-    <aside id="workspaceSidebar" class="w-60 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transition-all duration-200 z-10 shadow-sm">
+  <!-- MAIN APP CONTAINER -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- MOBILE SIDEBAR BACKDROP -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 hidden md:hidden transition-opacity" onclick="closeMobileSidebar()"></div>
+
+    <!-- WORKSPACES & GROUPS LIST (DRAWER ON MOBILE, STATIC ON DESKTOP) -->
+    <aside id="workspaceSidebar" class="fixed inset-y-0 left-0 w-72 bg-white z-50 transform -translate-x-full md:relative md:translate-x-0 md:w-60 flex flex-col flex-shrink-0 transition-transform duration-200 border-r border-gray-200 shadow-2xl md:shadow-sm">
       <div class="p-4 border-b border-gray-100 flex items-center justify-between">
         <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Grupos de Tarefas</span>
-        <button onclick="openCreateGroupModal()" class="text-[#0073ea] hover:bg-blue-50 p-1.5 rounded-lg transition" title="Criar novo grupo">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-        </button>
+        <div class="flex items-center space-x-1">
+          <button onclick="openCreateGroupModal()" class="text-[#0073ea] hover:bg-blue-50 p-1.5 rounded-lg transition" title="Criar novo grupo">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
+          <button onclick="closeMobileSidebar()" class="md:hidden text-gray-400 hover:text-gray-600 p-1.5 rounded-lg" title="Fechar menu">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Quick Group Navigation List -->
@@ -109,12 +249,22 @@
         <!-- Rendered dynamically via app.js -->
       </div>
 
-      <!-- Bottom Quick Actions -->
+      <!-- Bottom Quick Actions inside Sidebar -->
       <div class="p-3.5 border-t border-gray-100 space-y-2">
         <button onclick="openCloudConfigModal()" class="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 transition">
           <i data-lucide="cloud" class="w-4 h-4 text-[#0073ea]"></i>
           <span>Banco de Dados</span>
         </button>
+        <div class="grid grid-cols-2 gap-2 md:hidden">
+          <button onclick="exportDataBackup()" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Backup</span>
+          </button>
+          <button onclick="triggerImportBackup()" class="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-xl text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200">
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            <span>Restaurar</span>
+          </button>
+        </div>
         <button onclick="openCreateGroupModal()" class="w-full flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs font-bold text-[#0073ea] bg-blue-50 hover:bg-blue-100 transition shadow-sm">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>Criar Grupo</span>
@@ -176,7 +326,7 @@
     </main>
 
     <!-- RIGHT TASK DETAIL DRAWER -->
-    <div id="taskDrawer" class="fixed right-0 top-16 bottom-0 w-[460px] bg-white border-l border-gray-200 shadow-2xl transform translate-x-full transition-transform duration-200 z-50 flex flex-col">
+    <div id="taskDrawer" class="fixed inset-y-0 sm:top-16 right-0 w-full sm:w-[460px] max-w-full bg-white border-l border-gray-200 shadow-2xl transform translate-x-full transition-transform duration-200 z-50 flex flex-col">
       <div class="p-4 border-b border-gray-200 flex items-center justify-between bg-white">
         <div class="flex items-center space-x-2 truncate">
           <i data-lucide="check-square" class="w-5 h-5 text-[#0073ea]"></i>
@@ -419,6 +569,31 @@
       </div>
     </div>
   </div>
+
+  <!-- MOBILE BOTTOM NAVIGATION (SMARTPHONE PWA BAR) -->
+  <nav id="mobileBottomNav" class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 px-3 py-1.5 flex items-center justify-around shadow-lg safe-bottom">
+    <button id="bottomTabTable" class="mobile-nav-btn active flex flex-col items-center justify-center py-1 px-2.5 text-[11px] font-bold text-[#0073ea] transition" onclick="switchView('table')">
+      <i data-lucide="table" class="w-5 h-5 mb-0.5"></i>
+      <span>Quadro</span>
+    </button>
+    <button id="bottomTabKanban" class="mobile-nav-btn flex flex-col items-center justify-center py-1 px-2.5 text-[11px] font-bold text-gray-400 hover:text-gray-700 transition" onclick="switchView('kanban')">
+      <i data-lucide="kanban" class="w-5 h-5 mb-0.5"></i>
+      <span>Kanban</span>
+    </button>
+    <button onclick="mobileQuickAddTask()" class="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-[#0073ea] to-[#00c875] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition" title="Nova Tarefa">
+      <i data-lucide="plus" class="w-6 h-6"></i>
+    </button>
+    <button id="bottomTabCalendar" class="mobile-nav-btn flex flex-col items-center justify-center py-1 px-2.5 text-[11px] font-bold text-gray-400 hover:text-gray-700 transition" onclick="switchView('calendar')">
+      <i data-lucide="calendar" class="w-5 h-5 mb-0.5"></i>
+      <span>Calendário</span>
+    </button>
+    <button id="bottomTabGroups" class="mobile-nav-btn flex flex-col items-center justify-center py-1 px-2.5 text-[11px] font-bold text-gray-400 hover:text-gray-700 transition" onclick="toggleMobileSidebar()">
+      <i data-lucide="folder" class="w-5 h-5 mb-0.5"></i>
+      <span>Grupos</span>
+    </button>
+  </nav>
+
+  </div><!-- END #appContent -->
 
   <script src="app.js"></script>
 </body>

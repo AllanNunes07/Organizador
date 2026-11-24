@@ -151,6 +151,169 @@ function loadState() {
 // Firebase Cloud Integration Variables
 let db = null;
 let isFirebaseConnected = false;
+let currentUser = null;
+
+// ═══════════════════════════════════════════════════════
+// FIREBASE AUTHENTICATION
+// ═══════════════════════════════════════════════════════
+
+let authMode = 'login'; // 'login' or 'register'
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  const tabLogin = document.getElementById('tabLogin');
+  const tabRegister = document.getElementById('tabRegister');
+  const nameField = document.getElementById('registerNameField');
+  const submitText = document.getElementById('authSubmitText');
+  const forgotBtn = document.getElementById('forgotPasswordBtn');
+
+  document.getElementById('loginError')?.classList.add('hidden');
+  document.getElementById('loginSuccessMsg')?.classList.add('hidden');
+
+  if (mode === 'login') {
+    tabLogin.className = 'flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-white bg-white/10';
+    tabRegister.className = 'flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-gray-400 hover:text-gray-200';
+    nameField?.classList.add('hidden');
+    if (submitText) submitText.textContent = 'Entrar';
+    if (forgotBtn) forgotBtn.style.display = '';
+  } else {
+    tabRegister.className = 'flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-white bg-white/10';
+    tabLogin.className = 'flex-1 text-center py-2.5 text-sm font-bold rounded-xl transition text-gray-400 hover:text-gray-200';
+    nameField?.classList.remove('hidden');
+    if (submitText) submitText.textContent = 'Criar Conta';
+    if (forgotBtn) forgotBtn.style.display = 'none';
+  }
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('loginError');
+  const text = document.getElementById('loginErrorText');
+  if (el && text) {
+    text.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  document.getElementById('loginSuccessMsg')?.classList.add('hidden');
+}
+
+function showAuthSuccess(msg) {
+  const el = document.getElementById('loginSuccessMsg');
+  const text = document.getElementById('loginSuccessText');
+  if (el && text) {
+    text.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  document.getElementById('loginError')?.classList.add('hidden');
+}
+
+function getFirebaseAuthErrorMessage(code) {
+  const messages = {
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/user-disabled': 'Esta conta foi desativada.',
+    'auth/user-not-found': 'Nenhuma conta encontrada com este e-mail.',
+    'auth/wrong-password': 'Senha incorreta.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/email-already-in-use': 'Este e-mail já está sendo usado por outra conta.',
+    'auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/operation-not-allowed': 'Ative o provedor "E-mail/senha" no Firebase Console > Authentication > Método de login.',
+    'auth/too-many-requests': 'Muitas tentativas. Aguarde um momento e tente novamente.',
+    'auth/network-request-failed': 'Sem conexão com a internet.',
+  };
+  return messages[code] || 'Erro ao autenticar. Tente novamente.';
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = document.getElementById('authEmail')?.value?.trim();
+  const password = document.getElementById('authPassword')?.value;
+  const name = document.getElementById('authName')?.value?.trim();
+  const submitBtn = document.getElementById('authSubmitBtn');
+
+  if (!email || !password) return;
+
+  document.getElementById('loginError')?.classList.add('hidden');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const auth = firebase.auth();
+
+    if (authMode === 'register') {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      if (name && cred.user) {
+        await cred.user.updateProfile({ displayName: name });
+      }
+      showAuthSuccess('Conta criada com sucesso! Entrando...');
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+    // onAuthStateChanged will handle the rest
+  } catch (error) {
+    showAuthError(getFirebaseAuthErrorMessage(error.code));
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('authEmail')?.value?.trim();
+  if (!email) {
+    showAuthError('Digite seu e-mail acima para redefinir a senha.');
+    return;
+  }
+  try {
+    await firebase.auth().sendPasswordResetEmail(email);
+    showAuthSuccess('E-mail de redefinição enviado! Verifique sua caixa de entrada.');
+  } catch (error) {
+    showAuthError(getFirebaseAuthErrorMessage(error.code));
+  }
+}
+
+function handleLogout() {
+  if (confirm('Tem certeza que deseja sair?')) {
+    firebase.auth().signOut();
+  }
+}
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById('loginScreen')?.classList.add('hidden');
+  const appContent = document.getElementById('appContent');
+  if (appContent) {
+    appContent.classList.remove('hidden');
+    appContent.classList.add('flex', 'flex-col', 'h-screen');
+  }
+
+  // Update user badge
+  const initials = getInitials(user.displayName || user.email);
+  const displayEl = document.getElementById('userInitials');
+  const nameEl = document.getElementById('userDisplayName');
+  const emailEl = document.getElementById('userDisplayEmail');
+  if (displayEl) displayEl.textContent = initials;
+  if (nameEl) nameEl.textContent = user.displayName || user.email.split('@')[0];
+  if (emailEl) emailEl.textContent = user.email;
+
+  render();
+  initFirebase();
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function hideApp() {
+  currentUser = null;
+  document.getElementById('loginScreen')?.classList.remove('hidden');
+  const appContent = document.getElementById('appContent');
+  if (appContent) {
+    appContent.classList.add('hidden');
+    appContent.classList.remove('flex', 'flex-col');
+  }
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 function getSavedFirebaseConfig() {
   try {
@@ -279,6 +442,24 @@ function switchView(viewName) {
   if (viewName === "kanban") document.getElementById("viewTabKanban")?.classList.add("active");
   if (viewName === "calendar") document.getElementById("viewTabCalendar")?.classList.add("active");
 
+  // Update Mobile Bottom Nav Tabs
+  const mobileTabs = {
+    table: document.getElementById("bottomTabTable"),
+    kanban: document.getElementById("bottomTabKanban"),
+    calendar: document.getElementById("bottomTabCalendar")
+  };
+  Object.entries(mobileTabs).forEach(([key, btn]) => {
+    if (!btn) return;
+    if (key === viewName) {
+      btn.classList.add("active", "text-[#0073ea]");
+      btn.classList.remove("text-gray-400");
+    } else {
+      btn.classList.remove("active", "text-[#0073ea]");
+      btn.classList.add("text-gray-400");
+    }
+  });
+
+  closeMobileSidebar();
   render();
 }
 
@@ -772,27 +953,27 @@ function renderCalendarView() {
   });
 
   let html = `
-    <div class="bg-white rounded-3xl border border-gray-200 p-6 shadow-sm flex flex-col h-full">
-      <div class="flex items-center justify-between pb-4 border-b border-gray-100 mb-3">
+    <div class="bg-white rounded-3xl border border-gray-200 p-4 sm:p-5 shadow-sm flex flex-col" style="height: calc(100vh - 180px);">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100 mb-2 flex-shrink-0">
         <div class="flex items-center space-x-3">
-          <h2 class="text-lg font-black text-gray-900">${monthNames[currentMonth]} ${currentYear}</h2>
-          <button onclick="changeCalendarMonth(0)" class="text-xs bg-gray-100 hover:bg-gray-200 px-3.5 py-1.5 rounded-full text-gray-700 font-bold transition">Hoje</button>
+          <h2 class="text-base sm:text-lg font-black text-gray-900">${monthNames[currentMonth]} ${currentYear}</h2>
+          <button onclick="changeCalendarMonth(0)" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-full text-gray-700 font-bold transition">Hoje</button>
         </div>
         <div class="flex items-center space-x-1.5">
-          <button onclick="changeCalendarMonth(-1)" class="p-2 rounded-xl hover:bg-gray-100 text-gray-600 transition">
+          <button onclick="changeCalendarMonth(-1)" class="p-1.5 rounded-xl hover:bg-gray-100 text-gray-600 transition">
             <i data-lucide="chevron-left" class="w-4 h-4"></i>
           </button>
-          <button onclick="changeCalendarMonth(1)" class="p-2 rounded-xl hover:bg-gray-100 text-gray-600 transition">
+          <button onclick="changeCalendarMonth(1)" class="p-1.5 rounded-xl hover:bg-gray-100 text-gray-600 transition">
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </button>
         </div>
       </div>
 
-      <div class="grid grid-cols-7 text-center py-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+      <div class="grid grid-cols-7 text-center py-1.5 text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 flex-shrink-0">
         ${weekDays.map(d => `<div>${d}</div>`).join('')}
       </div>
 
-      <div class="calendar-grid flex-1">
+      <div class="calendar-grid flex-1 min-h-0">
   `;
 
   for (let i = firstDay - 1; i >= 0; i--) {
@@ -2069,8 +2250,33 @@ function disconnectFirebase() {
 // -------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
-  render();
-  initFirebase();
+  // Initialize Firebase app first
+  const cfg = getSavedFirebaseConfig();
+  if (cfg && cfg.apiKey && cfg.apiKey !== "SUA_API_KEY" && window.firebase) {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(cfg);
+    }
+
+    // Firebase Auth state observer - controls login/app visibility
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        showApp(user);
+      } else {
+        hideApp();
+      }
+    });
+  } else {
+    // No Firebase config: show app without auth (local only)
+    document.getElementById('loginScreen')?.classList.add('hidden');
+    const appContent = document.getElementById('appContent');
+    if (appContent) {
+      appContent.classList.remove('hidden');
+      appContent.classList.add('flex', 'flex-col', 'h-screen');
+    }
+    render();
+  }
+
+  if (window.lucide) window.lucide.createIcons();
 
   // Board Title Inline Edit
   const boardTitleEl = document.getElementById("boardTitle");
@@ -2218,4 +2424,70 @@ function handleImportFile(event) {
   reader.readAsText(file);
   event.target.value = "";
 }
+
+// -------------------------------------------------------------
+// MOBILE SIDEBAR, QUICK ACTIONS & PWA SERVICE WORKER
+// -------------------------------------------------------------
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById("workspaceSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  if (!sidebar) return;
+
+  const isClosed = sidebar.classList.contains("-translate-x-full");
+  if (isClosed) {
+    sidebar.classList.remove("-translate-x-full");
+    backdrop?.classList.remove("hidden");
+  } else {
+    sidebar.classList.add("-translate-x-full");
+    backdrop?.classList.add("hidden");
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("workspaceSidebar");
+  const backdrop = document.getElementById("sidebarBackdrop");
+  sidebar?.classList.add("-translate-x-full");
+  backdrop?.classList.add("hidden");
+}
+
+function mobileQuickAddTask() {
+  closeMobileSidebar();
+  if (state.groups.length > 0) {
+    quickAddTask(state.groups[0].id, "Nova Tarefa");
+  }
+}
+
+// PWA Install Prompt & Service Worker Registration
+let deferredPwaPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  if (!localStorage.getItem("pwa_banner_dismissed")) {
+    document.getElementById("pwaInstallBanner")?.classList.remove("hidden");
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("pwaInstallBtn")?.addEventListener("click", async () => {
+    if (!deferredPwaPrompt) return;
+    deferredPwaPrompt.prompt();
+    await deferredPwaPrompt.userChoice;
+    deferredPwaPrompt = null;
+    document.getElementById("pwaInstallBanner")?.classList.add("hidden");
+  });
+
+  document.getElementById("pwaDismissBtn")?.addEventListener("click", () => {
+    localStorage.setItem("pwa_banner_dismissed", "1");
+    document.getElementById("pwaInstallBanner")?.classList.add("hidden");
+  });
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch((err) => {
+      console.warn("SW registration warning:", err);
+    });
+  }
+});
+
 

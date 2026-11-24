@@ -258,6 +258,7 @@ body {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 1px;
   background-color: #e2e8f0;
   border: 1px solid #e2e8f0;
@@ -267,8 +268,8 @@ body {
 
 .calendar-cell {
   background-color: #ffffff;
-  min-height: 120px;
-  padding: 10px;
+  min-height: 60px;
+  padding: 4px 6px;
   transition: background-color 0.15s ease;
   display: flex;
   flex-direction: column;
@@ -285,11 +286,11 @@ body {
 }
 
 .calendar-task-pill {
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 2px 8px;
   border-radius: 9999px;
-  margin-top: 4px;
+  margin-top: 2px;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
@@ -297,6 +298,7 @@ body {
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: transform 0.1s;
+  line-height: 1.4;
 }
 .calendar-task-pill:hover {
   transform: scale(1.02);
@@ -337,3 +339,80 @@ body {
   border-color: #1e293b;
   transform: scale(1.1);
 }
+
+/* ==========================================================================
+   MOBILE SMARTPHONE & PWA OPTIMIZATIONS
+   ========================================================================== */
+
+/* Safe Area Insets for iPhones & Modern Android */
+.safe-bottom {
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.safe-top {
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* Touch Action Manipulation - Removes 300ms mobile tap delay */
+button, a, input, select, textarea, .rounded-status-pill, .rounded-priority-pill, .rounded-date-pill {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent auto-zoom on iOS when tapping inputs */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Make view container have bottom clearance for the mobile bottom nav */
+  #viewContainer {
+    padding: 14px 12px 90px 12px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Compact Kanban on Mobile */
+  .kanban-column {
+    min-width: 82vw !important;
+    max-width: 88vw !important;
+  }
+
+  /* Smooth horizontal scroll for table & sticky task name column */
+  .monday-table {
+    min-width: 680px;
+  }
+
+  .monday-table th:nth-child(2),
+  .monday-table td:nth-child(2) {
+    position: sticky;
+    left: 48px;
+    background-color: #ffffff;
+    z-index: 8;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04);
+  }
+
+  .monday-table tr:hover td:nth-child(2) {
+    background-color: #f8fafc;
+  }
+
+  /* Calendar cells on mobile */
+  .calendar-cell {
+    min-height: 50px;
+    padding: 3px 4px;
+  }
+
+  .calendar-task-pill {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+}
+
+/* Mobile Bottom Navigation active pill */
+.mobile-nav-btn.active {
+  color: #0073ea;
+}
+.mobile-nav-btn.active i {
+  transform: scale(1.15);
+  transition: transform 0.15s ease;
+}
+
